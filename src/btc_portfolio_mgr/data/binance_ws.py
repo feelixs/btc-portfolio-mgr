@@ -52,7 +52,8 @@ class HourlyResampler:
         if self._current_hour is None:
             self._current_hour = tick_hour
         elif tick_hour > self._current_hour:
-            assert self._last_mid is not None
+            if self._last_mid is None:
+                raise RuntimeError("invariant violated: hour rolled before any tick observed")
             emitted = {
                 "timestamp": self._current_hour,
                 "price": self._last_mid,

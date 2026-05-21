@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from btc_portfolio_mgr.data.coingecko import CoinGeckoClient
 from btc_portfolio_mgr.data.storage import write_parquet
 
-DEFAULT_OUT = Path("data/btc_hourly.parquet")
+DEFAULT_OUT = Path(__file__).resolve().parent.parent / "data" / "btc_hourly.parquet"
 DEFAULT_START = datetime(2018, 1, 1, tzinfo=timezone.utc)
 
 

@@ -21,7 +21,7 @@ class HourlyReader:
         df = self._df()
         return df.filter(
             (pl.col("timestamp") >= start) & (pl.col("timestamp") <= end)
-        )
+        ).sort("timestamp")
 
     def latest(self) -> dict:
         df = self._df()
