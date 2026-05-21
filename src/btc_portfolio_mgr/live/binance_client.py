@@ -47,10 +47,15 @@ class BinanceClient:
         resp = self.raw.mark_price(symbol=symbol)
         return float(resp["markPrice"])
 
-    def new_market_order(self, symbol: str, side: str, quantity: float) -> dict[str, Any]:
-        return self.raw.new_order(
-            symbol=symbol,
-            side=side,
-            type="MARKET",
-            quantity=quantity,
-        )
+    def new_market_order(
+        self, symbol: str, side: str, quantity: float, client_order_id: str | None = None
+    ) -> dict[str, Any]:
+        params: dict[str, Any] = {
+            "symbol": symbol,
+            "side": side,
+            "type": "MARKET",
+            "quantity": quantity,
+        }
+        if client_order_id is not None:
+            params["newClientOrderId"] = client_order_id
+        return self.raw.new_order(**params)
