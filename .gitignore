@@ -15,3 +15,5 @@ models/*.txt
 models/*.metadata.json
 models/*.json
 .idea/
+data/live_state.json
+HALT
