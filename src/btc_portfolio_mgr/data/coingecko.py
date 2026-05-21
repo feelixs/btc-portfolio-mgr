@@ -11,14 +11,23 @@ PRO_BASE = "https://pro-api.coingecko.com/api/v3"
 
 
 def parse_market_chart(payload: dict) -> pl.DataFrame:
-    """Convert /market_chart or /market_chart/range JSON to canonical schema."""
+    """Convert /market_chart or /market_chart/range JSON to canonical schema.
+
+    Timestamps are floored to the hour. CoinGecko returns samples at "hourly
+    granularity" but the actual timestamps drift by seconds-to-minutes from the
+    hour mark; flooring aligns them to the canonical hourly grid that the rest
+    of the pipeline (reindex_to_hourly, feature lookbacks, GARCH filter)
+    assumes.
+    """
     prices = payload["prices"]
     volumes_by_ts = {ts: v for ts, v in payload["total_volumes"]}
     rows = []
     for ts_ms, price in prices:
+        raw_ts = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc)
+        floored_ts = raw_ts.replace(minute=0, second=0, microsecond=0)
         rows.append(
             {
-                "timestamp": datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc),
+                "timestamp": floored_ts,
                 "price": float(price),
                 "volume": float(volumes_by_ts.get(ts_ms, 0.0)),
             }

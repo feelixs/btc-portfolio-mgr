@@ -22,6 +22,30 @@ def test_parse_market_chart_returns_canonical_schema(coingecko_range_response: d
     assert df["price"].to_list() == [42000.0, 42100.5]
 
 
+def test_parse_market_chart_floors_timestamps_to_hour() -> None:
+    # CoinGecko returns timestamps with sub-second/sub-minute offsets even at
+    # "hourly granularity". They must be floored to the hour so downstream
+    # reindex_to_hourly can match them on the clean hourly grid.
+    payload = {
+        "prices": [
+            [1704067206799, 42000.0],  # 2024-01-01 00:00:06.799 UTC
+            [1704070800254, 42100.0],  # 2024-01-01 01:00:00.254 UTC
+            [1704074474649, 42200.0],  # 2024-01-01 02:01:14.649 UTC
+        ],
+        "total_volumes": [
+            [1704067206799, 1.0],
+            [1704070800254, 2.0],
+            [1704074474649, 3.0],
+        ],
+    }
+    df = parse_market_chart(payload)
+    assert df["timestamp"].to_list() == [
+        datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc),
+        datetime(2024, 1, 1, 1, 0, 0, tzinfo=timezone.utc),
+        datetime(2024, 1, 1, 2, 0, 0, tzinfo=timezone.utc),
+    ]
+
+
 def test_chunk_date_range_under_max_returns_single_chunk() -> None:
     start = datetime(2024, 1, 1, tzinfo=timezone.utc)
     end = datetime(2024, 1, 31, tzinfo=timezone.utc)
