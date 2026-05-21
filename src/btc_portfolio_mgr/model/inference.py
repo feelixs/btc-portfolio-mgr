@@ -16,6 +16,8 @@ class ModelArtifact:
     feature_columns: list[str]
     target_horizon_hours: int
     trained_at: datetime
+    git_sha: str
+    cv_metrics: dict[str, float]
 
 
 def save_artifact(
@@ -28,6 +30,8 @@ def save_artifact(
         "feature_columns": artifact.feature_columns,
         "target_horizon_hours": artifact.target_horizon_hours,
         "trained_at": artifact.trained_at.isoformat(),
+        "git_sha": artifact.git_sha,
+        "cv_metrics": artifact.cv_metrics,
     }
     with metadata_path.open("w") as f:
         json.dump(metadata, f, indent=2)
@@ -43,6 +47,8 @@ def load_artifact(model_path: Path, metadata_path: Path) -> ModelArtifact:
         feature_columns=metadata["feature_columns"],
         target_horizon_hours=int(metadata["target_horizon_hours"]),
         trained_at=datetime.fromisoformat(metadata["trained_at"]),
+        git_sha=metadata["git_sha"],
+        cv_metrics=dict(metadata["cv_metrics"]),
     )
 
 

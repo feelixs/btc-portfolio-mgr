@@ -44,6 +44,12 @@ def test_train_script_produces_artifact(tmp_path: Path) -> None:
     assert "feature_columns" in metadata
     assert metadata["target_horizon_hours"] == 24
     assert "trained_at" in metadata
+    assert "git_sha" in metadata
+    assert "cv_metrics" in metadata
+    assert "mean_ic" in metadata["cv_metrics"]
+    assert "mean_hit_rate" in metadata["cv_metrics"]
+    assert "mean_rmse" in metadata["cv_metrics"]
+    assert "mean_r_squared" in metadata["cv_metrics"]
     # The CV result is exposed
     assert "mean_ic" in result
     assert "mean_hit_rate" in result

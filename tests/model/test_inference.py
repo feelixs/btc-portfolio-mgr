@@ -28,6 +28,8 @@ def _toy_artifact() -> ModelArtifact:
         feature_columns=list(FEATURE_COLUMNS),
         target_horizon_hours=24,
         trained_at=datetime(2026, 5, 20, 12, 0, tzinfo=timezone.utc),
+        git_sha="abc1234",
+        cv_metrics={"mean_ic": 0.05, "mean_hit_rate": 0.52, "mean_rmse": 0.015, "mean_r_squared": 0.01},
     )
 
 
@@ -42,6 +44,8 @@ def test_save_and_load_artifact_roundtrip(tmp_path: Path) -> None:
     assert loaded.feature_columns == artifact.feature_columns
     assert loaded.target_horizon_hours == artifact.target_horizon_hours
     assert loaded.trained_at == artifact.trained_at
+    assert loaded.git_sha == artifact.git_sha
+    assert loaded.cv_metrics == artifact.cv_metrics
     # Predictions match
     rng = np.random.default_rng(0)
     X_test = rng.normal(0, 1, (10, len(FEATURE_COLUMNS)))

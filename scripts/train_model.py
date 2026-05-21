@@ -9,6 +9,7 @@ import polars as pl
 
 from btc_portfolio_mgr.data.storage import read_parquet
 from btc_portfolio_mgr.features.schema import FEATURE_COLUMNS
+from btc_portfolio_mgr.model.git_info import current_git_sha
 from btc_portfolio_mgr.model.inference import ModelArtifact, save_artifact
 from btc_portfolio_mgr.model.target import build_dataset
 from btc_portfolio_mgr.model.train import cross_validate, train_lightgbm
@@ -60,6 +61,13 @@ def run(
         feature_columns=list(FEATURE_COLUMNS),
         target_horizon_hours=TARGET_HORIZON_HOURS,
         trained_at=datetime.now(tz=timezone.utc),
+        git_sha=current_git_sha(REPO_ROOT),
+        cv_metrics={
+            "mean_ic": cv.mean_ic,
+            "mean_hit_rate": cv.mean_hit_rate,
+            "mean_rmse": cv.mean_rmse,
+            "mean_r_squared": cv.mean_r_squared,
+        },
     )
     save_artifact(artifact, model_path, metadata_path)
     print(f"saved model to {model_path}")
