@@ -61,3 +61,10 @@ def test_assert_feature_schema_rejects_bad_input() -> None:
     bad = pl.DataFrame({"timestamp": [1], "ret_1h": [2.0]})
     with pytest.raises(FeatureSchemaMismatchError):
         assert_feature_schema(bad)
+
+
+def test_compose_features_empty_input_returns_empty_with_schema() -> None:
+    empty = pl.DataFrame(schema={"timestamp": pl.Datetime("us", "UTC"), "price": pl.Float64(), "volume": pl.Float64()})
+    features = compose_features(empty)
+    assert features.height == 0
+    assert features.schema == FEATURE_SCHEMA

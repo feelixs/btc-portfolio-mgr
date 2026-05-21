@@ -54,6 +54,8 @@ def compose_features(prices: pl.DataFrame) -> pl.DataFrame:
     where the relevant rolling window includes a data gap.
     """
     reindexed = reindex_to_hourly(prices)
+    if reindexed.height == 0:
+        return pl.DataFrame(schema=FEATURE_SCHEMA)
     columns: dict[str, pl.Series] = {"timestamp": reindexed["timestamp"]}
     for name, lb in _RETURN_LOOKBACKS.items():
         columns[name] = compute_log_return(reindexed, lb).alias(name)
