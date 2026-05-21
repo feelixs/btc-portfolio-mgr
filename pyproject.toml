@@ -11,6 +11,7 @@ dependencies = [
     "pyarrow>=16.0",
     "python-dotenv>=1.0",
     "lightgbm>=4.5",
+    "arch>=7.0",
 ]
 
 [project.optional-dependencies]
