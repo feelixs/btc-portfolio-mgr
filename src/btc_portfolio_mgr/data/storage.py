@@ -6,8 +6,8 @@ import polars as pl
 
 SCHEMA: dict[str, pl.DataType] = {
     "timestamp": pl.Datetime("us", "UTC"),
-    "price": pl.Float64,
-    "volume": pl.Float64,
+    "price": pl.Float64(),
+    "volume": pl.Float64(),
 }
 
 
