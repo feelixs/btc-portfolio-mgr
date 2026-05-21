@@ -145,3 +145,32 @@ def test_compute_target_weight_from_paths(tmp_path: Path) -> None:
     )
     assert isinstance(w, float)
     assert -1.0 <= w <= 1.0
+
+
+def test_compute_target_weight_raises_on_nan_mu() -> None:
+    import pytest
+
+    return_artifact = _toy_return_artifact()
+    vol_artifact, rets = _toy_vol_artifact_and_returns()
+    features = _toy_features_row()
+
+    # Patch predict to return a NaN Series
+    import btc_portfolio_mgr.sizing.pipeline as pipeline_module
+
+    def fake_predict(_artifact, _features):
+        return pl.Series("prediction", [float("nan")], dtype=pl.Float64)
+
+    original_predict = pipeline_module.predict
+    pipeline_module.predict = fake_predict
+    try:
+        with pytest.raises(ValueError, match="non-finite prediction"):
+            compute_target_weight(
+                return_artifact=return_artifact,
+                vol_artifact=vol_artifact,
+                features_row=features,
+                log_returns=rets,
+                current_weight=0.0,
+                params=DEFAULT_PARAMS,
+            )
+    finally:
+        pipeline_module.predict = original_predict

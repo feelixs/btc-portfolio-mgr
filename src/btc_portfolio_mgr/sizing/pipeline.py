@@ -1,6 +1,7 @@
 """End-to-end target-weight computation from artifacts + current state."""
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import polars as pl
@@ -40,7 +41,11 @@ def compute_target_weight(
         )
     mu_series = predict(return_artifact, features_row)
     mu = float(mu_series.to_numpy()[0])
+    if not math.isfinite(mu):
+        raise ValueError(f"return model produced non-finite prediction: mu={mu}")
     sigma = predict_24h_vol(vol_artifact, log_returns)
+    if not math.isfinite(sigma) or sigma <= 0:
+        raise ValueError(f"vol model produced invalid sigma: {sigma}")
     return target_weight(
         mu=mu,
         sigma=sigma,

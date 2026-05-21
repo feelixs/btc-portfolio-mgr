@@ -71,6 +71,11 @@ def predict_24h_vol(
     must provide `log_returns` from the data layer on every call. This keeps
     the artifact small and auditable; Phase 5 sizing fetches fresh returns
     each cycle anyway.
+
+    Backtest optimization: pass the FULL `log_returns` series and use
+    `last_obs_index` to walk forward instead of slicing the series each step.
+    arch's `am.fix()` then reconstructs the model once and forecasts at
+    different anchor points — much faster than rebuilding O(n) times.
     """
     return forecast_24h_vol(
         params=artifact.params,
