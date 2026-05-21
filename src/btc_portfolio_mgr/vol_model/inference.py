@@ -21,6 +21,9 @@ class VolArtifact:
     git_sha: str
     eval_metrics: dict[str, float]
     n_training_returns: int
+    horizon_hours: int = 24  # forecast horizon (e.g. 24, 168). GARCH params are
+    # horizon-agnostic, but this stamps the artifact with the horizon it was
+    # evaluated against and the default `predict_24h_vol` will use.
 
 
 def save_vol_artifact(artifact: VolArtifact, path: Path) -> None:
@@ -34,6 +37,7 @@ def save_vol_artifact(artifact: VolArtifact, path: Path) -> None:
         "git_sha": artifact.git_sha,
         "eval_metrics": artifact.eval_metrics,
         "n_training_returns": artifact.n_training_returns,
+        "horizon_hours": artifact.horizon_hours,
     }
     with path.open("w") as f:
         json.dump(data, f, indent=2)
@@ -57,6 +61,7 @@ def load_vol_artifact(path: Path) -> VolArtifact:
         git_sha=str(data["git_sha"]),
         eval_metrics={str(k): float(v) for k, v in data["eval_metrics"].items()},
         n_training_returns=int(data["n_training_returns"]),
+        horizon_hours=int(data.get("horizon_hours", 24)),
     )
 
 
@@ -65,12 +70,15 @@ def predict_24h_vol(
     log_returns: pl.Series,
     last_obs_index: int | None = None,
 ) -> float:
-    """Forecast integrated 24h vol from the artifact's saved params + provided returns.
+    """Forecast integrated vol over `artifact.horizon_hours` from saved params.
 
     The artifact intentionally does NOT store historical returns — the caller
     must provide `log_returns` from the data layer on every call. This keeps
     the artifact small and auditable; Phase 5 sizing fetches fresh returns
     each cycle anyway.
+
+    Despite the historical name, this forecasts over whatever horizon the
+    artifact was trained for (e.g. 168h for the 7d-return model pairing).
 
     Backtest optimization: pass the FULL `log_returns` series and use
     `last_obs_index` to walk forward instead of slicing the series each step.
@@ -83,4 +91,5 @@ def predict_24h_vol(
         spec=artifact.spec,
         scale_factor=artifact.scale_factor,
         last_obs_index=last_obs_index,
+        horizon_hours=artifact.horizon_hours,
     )

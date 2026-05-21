@@ -16,8 +16,8 @@ from btc_portfolio_mgr.vol_model.returns import extract_log_returns
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PRICES = REPO_ROOT / "data" / "btc_hourly.parquet"
 DEFAULT_FEATURES = REPO_ROOT / "data" / "btc_features.parquet"
-DEFAULT_RETURN_MODEL = REPO_ROOT / "models" / "btc_24h.txt"
-DEFAULT_RETURN_METADATA = REPO_ROOT / "models" / "btc_24h.metadata.json"
+DEFAULT_RETURN_MODEL = REPO_ROOT / "models" / "btc_7d.txt"
+DEFAULT_RETURN_METADATA = REPO_ROOT / "models" / "btc_7d.metadata.json"
 DEFAULT_VOL_ARTIFACT = REPO_ROOT / "models" / "btc_vol.json"
 
 
@@ -48,10 +48,17 @@ def run(
         mu=mu, sigma=sigma, current_weight=current_weight, params=DEFAULT_PARAMS
     )
 
-    print(f"mu (24h log return forecast):    {mu:+.6f}")
-    print(f"sigma (24h vol forecast):        {sigma:.6f}")
-    print(f"current_weight:                  {current_weight:+.4f}")
-    print(f"target_weight (after threshold): {w:+.4f}")
+    return_horizon = return_artifact.target_horizon_hours
+    vol_horizon = vol_artifact.horizon_hours
+    if return_horizon != vol_horizon:
+        print(
+            f"WARNING: return horizon ({return_horizon}h) != vol horizon "
+            f"({vol_horizon}h). Kelly formula assumes same horizon."
+        )
+    print(f"mu ({return_horizon}h log return forecast):    {mu:+.6f}")
+    print(f"sigma ({vol_horizon}h vol forecast):           {sigma:.6f}")
+    print(f"current_weight:                                {current_weight:+.4f}")
+    print(f"target_weight (after threshold):               {w:+.4f}")
     return {
         "mu": mu,
         "sigma": sigma,

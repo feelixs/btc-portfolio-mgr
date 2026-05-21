@@ -15,13 +15,17 @@ from tests.fixtures.synthetic_prices import hourly
 def test_train_script_produces_artifact(tmp_path: Path) -> None:
     from scripts import train_model as tm
 
-    # Need enough rows to satisfy 2160h zscore_90d lookback + 24h target + room to train.
-    n = 2500
+    # Need:
+    #   - 2160h zscore_90d warmup
+    #   - 168h forward target window
+    #   - enough daily samples (post-resampling) so LightGBM has data per fold
+    # 8000 hourly rows -> ~333 days; after warmup ~243 days; with 3 folds = ~81/fold.
+    n = 8000
     prices = hourly([100.0 + i * 0.01 + (i % 7) * 0.05 for i in range(n)])
     prices_path = tmp_path / "btc_hourly.parquet"
     features_path = tmp_path / "btc_features.parquet"
-    model_path = tmp_path / "btc_24h.txt"
-    metadata_path = tmp_path / "btc_24h.metadata.json"
+    model_path = tmp_path / "btc_7d.txt"
+    metadata_path = tmp_path / "btc_7d.metadata.json"
 
     write_parquet(prices, prices_path)
     features = compose_features(prices)
@@ -42,7 +46,7 @@ def test_train_script_produces_artifact(tmp_path: Path) -> None:
     # Metadata contains the right keys
     metadata = json.loads(metadata_path.read_text())
     assert "feature_columns" in metadata
-    assert metadata["target_horizon_hours"] == 24
+    assert metadata["target_horizon_hours"] == 168  # 7d
     assert "trained_at" in metadata
     assert "git_sha" in metadata
     assert "cv_metrics" in metadata

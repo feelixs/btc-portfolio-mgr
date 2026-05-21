@@ -1,4 +1,4 @@
-"""Train the BTC GJR-GARCH 24h vol model: fit, in-sample eval, save JSON artifact."""
+"""Train the BTC GJR-GARCH vol model at HORIZON_HOURS: fit, in-sample eval, save."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -9,7 +9,10 @@ import numpy as np
 
 from btc_portfolio_mgr.data.storage import read_parquet
 from btc_portfolio_mgr.model.git_info import current_git_sha
-from btc_portfolio_mgr.vol_model.garch import fit_gjr_garch, forecast_24h_vol
+from btc_portfolio_mgr.vol_model.garch import (
+    fit_gjr_garch,
+    forecast_integrated_vols_batch,
+)
 from btc_portfolio_mgr.vol_model.inference import VolArtifact, save_vol_artifact
 from btc_portfolio_mgr.vol_model.metrics import (
     compute_mae_vol,
@@ -25,30 +28,42 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PRICES = REPO_ROOT / "data" / "btc_hourly.parquet"
 DEFAULT_ARTIFACT = REPO_ROOT / "models" / "btc_vol.json"
 
+HORIZON_HOURS = 168  # 7 days — matches the return model's prediction horizon
 WARMUP_OBS = 500
-EVAL_STRIDE = 24
+# One eval per week. At 168h horizon, daily stride would produce 7x redundant
+# evals (each forecast's target window covers the next 6 stride steps); weekly
+# stride yields ~independent samples and cuts the eval loop to ~1-2 minutes.
+EVAL_STRIDE = 168
 
 
 def _evaluate_in_sample(
     params: dict[str, float],
     log_returns: Any,
-    realized_24h_arr: np.ndarray,
+    realized_arr: np.ndarray,
+    horizon_hours: int,
 ) -> dict[str, float]:
+    # Single batched arch call computes integrated vol forecasts at every anchor
+    # from WARMUP_OBS onward — far faster than rebuilding the arch model in a
+    # per-anchor loop.
     n = log_returns.len()
+    pred_vols_all = forecast_integrated_vols_batch(
+        params=params,
+        log_returns=log_returns,
+        horizon_hours=horizon_hours,
+        start_index=WARMUP_OBS,
+        spec=DEFAULT_SPEC,
+        scale_factor=SCALE_FACTOR,
+    )
+    # pred_vols_all[i] is the forecast anchored at obs WARMUP_OBS + i.
+    # Walk by EVAL_STRIDE and align realized vol over [t+1, t+horizon].
     preds: list[float] = []
     realized: list[float] = []
-    for t in range(WARMUP_OBS, n - 24, EVAL_STRIDE):
-        forecast_vol = forecast_24h_vol(
-            params=params,
-            log_returns=log_returns,
-            spec=DEFAULT_SPEC,
-            scale_factor=SCALE_FACTOR,
-            last_obs_index=t,
-        )
-        realized_vol = float(realized_24h_arr[t + 24])
-        if not np.isfinite(realized_vol):
+    for t in range(WARMUP_OBS, n - horizon_hours, EVAL_STRIDE):
+        pred_vol = float(pred_vols_all[t - WARMUP_OBS])
+        realized_vol = float(realized_arr[t + horizon_hours])
+        if not np.isfinite(realized_vol) or not np.isfinite(pred_vol):
             continue
-        preds.append(forecast_vol)
+        preds.append(pred_vol)
         realized.append(realized_vol)
     pred_arr = np.array(preds)
     real_arr = np.array(realized)
@@ -63,6 +78,7 @@ def _evaluate_in_sample(
 def run(
     prices_path: Path = DEFAULT_PRICES,
     artifact_path: Path = DEFAULT_ARTIFACT,
+    horizon_hours: int = HORIZON_HOURS,
 ) -> dict[str, Any]:
     prices = read_parquet(prices_path)
     rets_df = extract_log_returns(prices)
@@ -78,9 +94,11 @@ def run(
         f"beta={params['beta[1]']:.4f} "
         f"nu={params.get('nu', float('nan')):.2f}"
     )
-    realized_24h = compute_realized_24h_vol(log_returns, window_hours=24)
-    metrics = _evaluate_in_sample(params, log_returns, realized_24h.to_numpy())
-    print("in-sample 24h vol forecast metrics:")
+    realized = compute_realized_24h_vol(log_returns, window_hours=horizon_hours)
+    metrics = _evaluate_in_sample(
+        params, log_returns, realized.to_numpy(), horizon_hours
+    )
+    print(f"in-sample {horizon_hours}h vol forecast metrics:")
     for k, v in metrics.items():
         print(f"  {k}: {v:.6f}")
 
@@ -92,10 +110,11 @@ def run(
         git_sha=current_git_sha(REPO_ROOT),
         eval_metrics=metrics,
         n_training_returns=n,
+        horizon_hours=horizon_hours,
     )
     save_vol_artifact(artifact, artifact_path)
     print(f"saved vol artifact to {artifact_path}")
-    return {**metrics, "n_training_returns": n}
+    return {**metrics, "n_training_returns": n, "horizon_hours": horizon_hours}
 
 
 def main() -> None:
