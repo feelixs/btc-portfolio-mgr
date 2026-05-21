@@ -12,6 +12,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "lightgbm>=4.5",
     "arch>=7.0",
+    "binance-futures-connector>=4.0",
 ]
 
 [project.optional-dependencies]
