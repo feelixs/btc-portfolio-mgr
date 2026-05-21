@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import polars as pl
 
+MAX_INTERPOLATION_HOURS = 6
+
 
 def reindex_to_hourly(prices: pl.DataFrame) -> pl.DataFrame:
     """Reindex to a complete hourly grid from min to max timestamp.
@@ -77,3 +79,38 @@ def find_gaps(prices: pl.DataFrame) -> pl.DataFrame:
             "missing_hours": pl.Int64,
         },
     )
+
+
+def interpolate_short_gaps(
+    reindexed: pl.DataFrame, max_gap_hours: int = MAX_INTERPOLATION_HOURS
+) -> pl.DataFrame:
+    """Linear-interpolate `price` across null gaps of at most `max_gap_hours`.
+
+    Longer gaps remain null. Volume is intentionally NOT interpolated (volume
+    is a flow quantity; the missing-hour volume is genuinely unknown). The
+    input MUST be the output of `reindex_to_hourly` (a complete hourly grid).
+
+    Rationale: CoinGecko occasionally drops a sample for a given hour. The
+    price didn't actually pause — we just don't have a snapshot. A short-gap
+    linear interpolation is closer to the unobserved truth than treating the
+    hour as missing data forever, which propagates 90 days of nulls into
+    `zscore_90d` and similar long-lookback features.
+    """
+    if max_gap_hours < 0:
+        raise ValueError(f"max_gap_hours must be non-negative, got {max_gap_hours}")
+    if reindexed.height == 0:
+        return reindexed
+    df = (
+        reindexed.with_columns(_is_null=pl.col("price").is_null())
+        .with_columns(_run_id=pl.col("_is_null").rle_id())
+        .with_columns(_run_length=pl.col("_run_id").len().over("_run_id"))
+        .with_columns(_interpolated=pl.col("price").interpolate())
+    )
+    df = df.with_columns(
+        price=pl.when(
+            pl.col("_is_null") & (pl.col("_run_length") <= max_gap_hours)
+        )
+        .then(pl.col("_interpolated"))
+        .otherwise(pl.col("price"))
+    )
+    return df.drop("_is_null", "_run_id", "_run_length", "_interpolated")

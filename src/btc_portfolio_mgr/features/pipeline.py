@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import polars as pl
 
-from btc_portfolio_mgr.features.gaps import reindex_to_hourly
+from btc_portfolio_mgr.features.gaps import interpolate_short_gaps, reindex_to_hourly
 from btc_portfolio_mgr.features.regime import (
     compute_kaufman_efficiency,
     compute_ma_zscore,
@@ -56,6 +56,7 @@ def compose_features(prices: pl.DataFrame) -> pl.DataFrame:
     reindexed = reindex_to_hourly(prices)
     if reindexed.height == 0:
         return pl.DataFrame(schema=FEATURE_SCHEMA)
+    reindexed = interpolate_short_gaps(reindexed)
     columns: dict[str, pl.Series] = {"timestamp": reindexed["timestamp"]}
     for name, lb in _RETURN_LOOKBACKS.items():
         columns[name] = compute_log_return(reindexed, lb).alias(name)

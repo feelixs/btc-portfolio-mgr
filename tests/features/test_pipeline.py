@@ -42,17 +42,19 @@ def test_compose_features_early_rows_are_null_for_long_lookbacks() -> None:
 
 
 def test_compose_features_propagates_gap_nulls() -> None:
-    # Tight series: 50 hours, then 5-hour gap, then 50 hours.
+    # 50 hours, then a long gap (> MAX_INTERPOLATION_HOURS), then 50 hours.
+    # The gap must exceed the interpolation threshold so prices stay null.
+    GAP = 12
     prices = with_gap(
         prices_before=[100.0 + i * 0.01 for i in range(50)],
-        gap_hours=5,
+        gap_hours=GAP,
         prices_after=[110.0 + i * 0.01 for i in range(50)],
     )
     features = compose_features(prices)
-    # Reindexed length: 50 + 5 + 50 = 105
-    assert features.height == 105
-    # Rows inside the gap (indices 50..54) have null prices -> all features null.
-    for idx in range(50, 55):
+    # Reindexed length: 50 + GAP + 50 = 50 + 12 + 50 = 112.
+    assert features.height == 50 + GAP + 50
+    # Rows inside the gap have null prices -> all features null.
+    for idx in range(50, 50 + GAP):
         for col in FEATURE_COLUMNS:
             assert features[col].to_list()[idx] is None, f"col {col} idx {idx}"
 
