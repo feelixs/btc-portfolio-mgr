@@ -1,4 +1,10 @@
-"""Train the BTC 24h-ahead return model: purged CV, then final fit on all data."""
+"""Train the BTC 7d-ahead return model on daily-resampled features.
+
+The target is the forward 7-day log return. To break label autocorrelation
+(adjacent hourly rows share 167/168 hours of the same 7d label window), we
+resample the feature dataset down to one row per day before purged CV. This
+produces a statistically honest IC estimate.
+"""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -17,11 +23,15 @@ from btc_portfolio_mgr.model.train import cross_validate, train_lightgbm
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PRICES = REPO_ROOT / "data" / "btc_hourly.parquet"
 DEFAULT_FEATURES = REPO_ROOT / "data" / "btc_features.parquet"
-DEFAULT_MODEL = REPO_ROOT / "models" / "btc_24h.txt"
-DEFAULT_METADATA = REPO_ROOT / "models" / "btc_24h.metadata.json"
+DEFAULT_MODEL = REPO_ROOT / "models" / "btc_7d.txt"
+DEFAULT_METADATA = REPO_ROOT / "models" / "btc_7d.metadata.json"
 
-TARGET_HORIZON_HOURS = 24
-EMBARGO_HOURS = 24
+TARGET_HORIZON_HOURS = 168  # 7 days — the actual prediction horizon
+SAMPLE_PERIOD_HOURS = 24  # train on one row per day to break label autocorrelation
+# Purged-CV offsets expressed in ROW positions, not wall-clock hours. After
+# daily resampling, 1 row == 1 day, so 7 rows = 7 days of label coverage.
+PURGE_ROWS = TARGET_HORIZON_HOURS // SAMPLE_PERIOD_HOURS  # = 7
+EMBARGO_ROWS = TARGET_HORIZON_HOURS // SAMPLE_PERIOD_HOURS  # = 7
 
 
 def run(
@@ -36,13 +46,18 @@ def run(
     prices = read_parquet(prices_path)
     features = pl.read_parquet(features_path)
     dataset = build_dataset(features, prices, horizon_hours=TARGET_HORIZON_HOURS)
-    print(f"dataset: {dataset.height} rows after null-drop")
+    print(f"dataset: {dataset.height} hourly rows after null-drop")
+
+    # Resample to one row per day (midnight UTC) so adjacent samples don't share
+    # 167/168 hours of the same 7d forward label.
+    dataset = dataset.filter(pl.col("timestamp").dt.hour() == 0)
+    print(f"dataset: {dataset.height} daily rows after resampling")
 
     cv = cross_validate(
         dataset,
         n_folds=n_folds,
-        label_horizon_hours=TARGET_HORIZON_HOURS,
-        embargo_hours=EMBARGO_HOURS,
+        label_horizon_hours=PURGE_ROWS,
+        embargo_hours=EMBARGO_ROWS,
         num_boost_round=num_boost_round,
     )
     print(f"CV (n_folds={n_folds}):")
