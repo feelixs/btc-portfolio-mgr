@@ -13,7 +13,10 @@ from btc_portfolio_mgr.data.coingecko import CoinGeckoClient
 from btc_portfolio_mgr.data.storage import write_parquet
 
 DEFAULT_OUT = Path(__file__).resolve().parent.parent / "data" / "btc_hourly.parquet"
-DEFAULT_START = datetime(2018, 1, 1, tzinfo=timezone.utc)
+# Skip Jan-Mar 2018 — CoinGecko Pro returns daily (not hourly) data for that
+# window, which propagates through Phase 2's 90-day-lookback nulls and destroys
+# the usable training set. 2019+ is ~99% hourly coverage.
+DEFAULT_START = datetime(2019, 1, 1, tzinfo=timezone.utc)
 
 
 async def run(
