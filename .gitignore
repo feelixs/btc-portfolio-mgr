@@ -11,3 +11,5 @@ data/*.jsonl.gz
 dist/
 build/
 .DS_Store
+models/*.txt
+models/*.metadata.json
