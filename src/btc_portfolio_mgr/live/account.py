@@ -20,11 +20,19 @@ def get_equity_usdt(client: Any) -> float:
 
 
 def get_position_btc(client: Any, symbol: str) -> float:
-    """Signed position size in BTC contracts (positive = long, negative = short, 0 = flat)."""
+    """Signed position size in BTC (one-way mode). Raises if account is in hedge mode."""
     rows = client.position_info(symbol=symbol)
     if not rows:
         return 0.0
-    return float(rows[0]["positionAmt"])
+    both_rows = [r for r in rows if r.get("positionSide", "BOTH") == "BOTH"]
+    if not both_rows:
+        raise RuntimeError(
+            f"no positionSide=BOTH row for {symbol}; account is likely in hedge mode "
+            f"(we require one-way mode)"
+        )
+    if len(both_rows) > 1:
+        raise RuntimeError(f"multiple BOTH rows for {symbol}: {both_rows}")
+    return float(both_rows[0]["positionAmt"])
 
 
 def get_symbol_info(client: Any, symbol: str) -> SymbolInfo:

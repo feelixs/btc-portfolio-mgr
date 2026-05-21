@@ -20,13 +20,13 @@ def test_get_equity_usdt():
 
 def test_get_position_btc_long():
     client = MagicMock()
-    client.position_info.return_value = [{"positionAmt": "0.0123"}]
+    client.position_info.return_value = [{"positionAmt": "0.0123", "positionSide": "BOTH"}]
     assert abs(get_position_btc(client, "BTCUSDT") - 0.0123) < 1e-12
 
 
 def test_get_position_btc_short():
     client = MagicMock()
-    client.position_info.return_value = [{"positionAmt": "-0.005"}]
+    client.position_info.return_value = [{"positionAmt": "-0.005", "positionSide": "BOTH"}]
     assert abs(get_position_btc(client, "BTCUSDT") - (-0.005)) < 1e-12
 
 
@@ -34,6 +34,17 @@ def test_get_position_btc_empty():
     client = MagicMock()
     client.position_info.return_value = []
     assert get_position_btc(client, "BTCUSDT") == 0.0
+
+
+def test_get_position_btc_raises_on_hedge_mode():
+    import pytest
+    client = MagicMock()
+    client.position_info.return_value = [
+        {"positionAmt": "0.01", "positionSide": "LONG"},
+        {"positionAmt": "-0.005", "positionSide": "SHORT"},
+    ]
+    with pytest.raises(RuntimeError, match="hedge mode"):
+        get_position_btc(client, "BTCUSDT")
 
 
 def test_get_symbol_info_parses_filters():
