@@ -13,3 +13,5 @@ build/
 .DS_Store
 models/*.txt
 models/*.metadata.json
+models/*.json
+.idea/
