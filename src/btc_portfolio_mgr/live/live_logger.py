@@ -1,6 +1,7 @@
 """Append-only parquet log of every live cycle. Fixed schema."""
 from __future__ import annotations
 
+import os
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -45,12 +46,22 @@ class LiveLogRow:
     halt_reason: str | None
 
 
+def _reindex_to_schema(df: pl.DataFrame) -> pl.DataFrame:
+    """Add missing columns (as nulls of declared dtype) so concat is safe."""
+    for col, dtype in LOG_SCHEMA.items():
+        if col not in df.columns:
+            df = df.with_columns(pl.lit(None).cast(dtype).alias(col))
+    return df.select(list(LOG_SCHEMA.keys()))
+
+
 def append_log_row(path: Path, row: LiveLogRow) -> None:
     new_df = pl.DataFrame([asdict(row)], schema=LOG_SCHEMA)
     if path.exists():
-        existing = pl.read_parquet(path)
+        existing = _reindex_to_schema(pl.read_parquet(path))
         combined = pl.concat([existing, new_df], how="vertical_relaxed")
     else:
         combined = new_df
     path.parent.mkdir(parents=True, exist_ok=True)
-    combined.write_parquet(path)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    combined.write_parquet(tmp)
+    os.replace(tmp, path)
