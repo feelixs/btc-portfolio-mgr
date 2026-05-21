@@ -40,7 +40,13 @@ def save_vol_artifact(artifact: VolArtifact, path: Path) -> None:
 
 
 def load_vol_artifact(path: Path) -> VolArtifact:
-    """Restore VolArtifact from JSON."""
+    """Restore VolArtifact from JSON.
+
+    Note: the key order in `data["params"]` is load-bearing — am.fix()
+    in forecast_24h_vol receives the params as a positional array, so
+    hand-editing the JSON to reorder keys will produce silently wrong
+    forecasts. Treat the artifact as opaque.
+    """
     with path.open() as f:
         data = json.load(f)
     return VolArtifact(
@@ -59,7 +65,13 @@ def predict_24h_vol(
     log_returns: pl.Series,
     last_obs_index: int | None = None,
 ) -> float:
-    """Forecast integrated 24h vol from the artifact's saved params + provided returns."""
+    """Forecast integrated 24h vol from the artifact's saved params + provided returns.
+
+    The artifact intentionally does NOT store historical returns — the caller
+    must provide `log_returns` from the data layer on every call. This keeps
+    the artifact small and auditable; Phase 5 sizing fetches fresh returns
+    each cycle anyway.
+    """
     return forecast_24h_vol(
         params=artifact.params,
         log_returns=log_returns,
