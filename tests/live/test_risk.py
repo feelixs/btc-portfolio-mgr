@@ -111,3 +111,25 @@ def test_state_roundtrip(tmp_path):
 def test_load_state_returns_zero_state_when_missing(tmp_path):
     loaded = load_state(tmp_path / "missing.json")
     assert loaded == LiveState(peak_equity=0.0, consec_losses=0, last_equity=0.0)
+
+
+def test_evaluate_risk_rejects_naive_datetimes():
+    import pytest
+    naive_now = datetime(2026, 5, 21, 12, 0)  # no tzinfo
+    state = LiveState(peak_equity=100.0, consec_losses=0, last_equity=100.0)
+    with pytest.raises(ValueError, match="tz-aware"):
+        evaluate_risk(
+            state=state,
+            equity=100.0,
+            latest_bar_ts=NOW - timedelta(hours=1),
+            now=naive_now,
+            halt_file=Path("/tmp/does-not-exist-halt"),
+        )
+    with pytest.raises(ValueError, match="tz-aware"):
+        evaluate_risk(
+            state=state,
+            equity=100.0,
+            latest_bar_ts=naive_now,
+            now=NOW,
+            halt_file=Path("/tmp/does-not-exist-halt"),
+        )

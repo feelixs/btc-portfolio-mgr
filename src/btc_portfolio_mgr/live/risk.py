@@ -31,6 +31,11 @@ def evaluate_risk(
     now: datetime,
     halt_file: Path,
 ) -> RiskCheck:
+    if latest_bar_ts.tzinfo is None or now.tzinfo is None:
+        raise ValueError(
+            f"evaluate_risk requires tz-aware datetimes; got "
+            f"latest_bar_ts={latest_bar_ts}, now={now}"
+        )
     if halt_file.exists():
         return RiskCheck(allowed=False, reason=f"halt file present at {halt_file}")
     if state.peak_equity > 0:
