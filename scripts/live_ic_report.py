@@ -20,13 +20,17 @@ def main() -> int:
         print(f"no live log at {LOG_PATH}")
         return 1
     log = pl.read_parquet(LOG_PATH)
-    prices = pl.read_parquet(PRICES_PATH)
+    prices = pl.read_parquet(PRICES_PATH).sort("timestamp")  # ensure time-sorted
+    max_price_ts = prices["timestamp"].max()
     rows = []
     for r in log.iter_rows(named=True):
         if r["halted"] or r["mu"] is None:
             continue
         ts = r["timestamp"]
         ts_future = ts + timedelta(days=HORIZON_DAYS)
+        if ts_future > max_price_ts:
+            # Future window not yet realized — skip rather than use stale last bar.
+            continue
         p_now = prices.filter(pl.col("timestamp") <= ts).tail(1)
         p_fut = prices.filter(pl.col("timestamp") <= ts_future).tail(1)
         if p_now.height == 0 or p_fut.height == 0:
