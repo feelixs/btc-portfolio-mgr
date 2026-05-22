@@ -55,8 +55,15 @@ def _post(payload: dict[str, Any]) -> None:
     if not url:
         return
     data = json.dumps(payload).encode("utf-8")
+    # Discord rejects the default `Python-urllib/...` UA with HTTP 403.
     req = Request(
-        url, data=data, headers={"Content-Type": "application/json"}, method="POST"
+        url,
+        data=data,
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "btc-portfolio-mgr (+https://github.com/feelixs/btc-portfolio-mgr, 1.0)",
+        },
+        method="POST",
     )
     try:
         with urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
