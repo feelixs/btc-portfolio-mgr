@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -188,17 +189,38 @@ def run(dry_run: bool = False) -> int:
         ),
     )
 
-    decision = reconcile_to_target(
-        client=client,
-        symbol_info=symbol_info,
-        equity_usdt=equity_before,
-        target_weight=inference.target_weight,
-        current_btc=current_btc,
-        price_usdt=mark_price,
-        client_order_id=client_order_id,
-    )
+    try:
+        decision = reconcile_to_target(
+            client=client,
+            symbol_info=symbol_info,
+            equity_usdt=equity_before,
+            target_weight=inference.target_weight,
+            current_btc=current_btc,
+            price_usdt=mark_price,
+            client_order_id=client_order_id,
+        )
+    except Exception as exc:
+        append_log_row(
+            LOG_PATH,
+            _log_row(
+                now=datetime.now(tz=timezone.utc),
+                equity_before=equity_before,
+                equity_after=equity_before,  # unknown; conservative
+                current_weight=current_weight,
+                target_weight=inference.target_weight,
+                mu=inference.mu,
+                sigma=inference.sigma,
+                action="error",
+                delta_btc=delta_intended,
+                notional_usdt=abs(delta_intended) * mark_price,
+                reason=f"{client_order_id}: {exc}",
+            ),
+        )
+        raise
     print(f"  ORDER: {decision.action} side={decision.side} qty={decision.quantity:.6f}")
 
+    # Let Binance settle realized PnL into wallet balance before refetching equity.
+    time.sleep(2.0)
     # Re-fetch equity after the order to capture realized PnL + fees.
     equity_after = get_equity_usdt(client)
     new_state = update_state(state, equity=equity_after)
