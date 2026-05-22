@@ -1,0 +1,13 @@
+[Unit]
+Description=BTC Portfolio Manager — one cycle
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/btc-portfolio-mgr
+EnvironmentFile=/opt/btc-portfolio-mgr/.env
+ExecStart=/opt/btc-portfolio-mgr/.venv/bin/python scripts/run_live.py
+StandardOutput=append:/var/log/btc-portfolio.log
+StandardError=append:/var/log/btc-portfolio.log
+User=btcbot
+Group=btcbot

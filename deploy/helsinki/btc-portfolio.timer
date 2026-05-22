@@ -1,0 +1,10 @@
+[Unit]
+Description=BTC Portfolio Manager — daily 00:05 UTC
+
+[Timer]
+OnCalendar=*-*-* 00:05:00 UTC
+Persistent=true
+Unit=btc-portfolio.service
+
+[Install]
+WantedBy=timers.target
