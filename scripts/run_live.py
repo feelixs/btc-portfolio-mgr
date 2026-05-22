@@ -17,6 +17,12 @@ from btc_portfolio_mgr.live.account import (
 from btc_portfolio_mgr.live.binance_client import BinanceClient
 from btc_portfolio_mgr.live.inference_loop import run_inference
 from btc_portfolio_mgr.live.live_logger import LiveLogRow, append_log_row
+from btc_portfolio_mgr.live.notifications import (
+    HaltContext,
+    SummaryContext,
+    post_halt,
+    post_summary,
+)
 from btc_portfolio_mgr.live.order_manager import reconcile_to_target
 from btc_portfolio_mgr.live.risk import (
     LiveState,
@@ -142,6 +148,33 @@ def run(dry_run: bool = False) -> int:
             ),
         )
         save_state(STATE_PATH, state)
+        peak_equity = state.peak_equity if state.peak_equity > 0 else equity_before
+        dd = (1.0 - equity_before / peak_equity) if peak_equity > 0 else 0.0
+        post_halt(HaltContext(
+            network=client.network,
+            reason=risk.reason or "unknown",
+            equity=equity_before,
+            position_btc=current_btc,
+            mark_price=mark_price,
+        ))
+        post_summary(SummaryContext(
+            network=client.network,
+            equity_before=equity_before,
+            equity_after=equity_before,
+            position_btc=current_btc,
+            mark_price=mark_price,
+            mu=inference.mu,
+            sigma=inference.sigma,
+            target_weight=inference.target_weight,
+            action="halt",
+            order_side=None,
+            order_qty=0.0,
+            order_notional=0.0,
+            halted=True,
+            halt_reason=risk.reason,
+            drawdown=dd,
+            peak_equity=peak_equity,
+        ))
         return 0
 
     target_btc = (equity_before * inference.target_weight) / mark_price
@@ -168,6 +201,26 @@ def run(dry_run: bool = False) -> int:
                 reason="dry_run_flag",
             ),
         )
+        peak_equity = state.peak_equity if state.peak_equity > 0 else equity_before
+        dd = (1.0 - equity_before / peak_equity) if peak_equity > 0 else 0.0
+        post_summary(SummaryContext(
+            network=client.network,
+            equity_before=equity_before,
+            equity_after=equity_before,
+            position_btc=current_btc,
+            mark_price=mark_price,
+            mu=inference.mu,
+            sigma=inference.sigma,
+            target_weight=inference.target_weight,
+            action="dry_run",
+            order_side=None,
+            order_qty=0.0,
+            order_notional=abs(delta_intended) * mark_price,
+            halted=False,
+            halt_reason=None,
+            drawdown=dd,
+            peak_equity=peak_equity,
+        ))
         return 0
 
     # Live: generate id BEFORE the network call, log pre-order row, then submit.
@@ -244,6 +297,28 @@ def run(dry_run: bool = False) -> int:
             reason=decision.reason,
         ),
     )
+    peak_equity = new_state.peak_equity if new_state.peak_equity > 0 else equity_after
+    dd = (1.0 - equity_after / peak_equity) if peak_equity > 0 else 0.0
+    # Reflect actual filled position post-order
+    position_after = current_btc + decision.delta_btc
+    post_summary(SummaryContext(
+        network=client.network,
+        equity_before=equity_before,
+        equity_after=equity_after,
+        position_btc=position_after,
+        mark_price=mark_price,
+        mu=inference.mu,
+        sigma=inference.sigma,
+        target_weight=inference.target_weight,
+        action=decision.action,
+        order_side=decision.side,
+        order_qty=decision.quantity,
+        order_notional=decision.notional_usdt,
+        halted=False,
+        halt_reason=None,
+        drawdown=dd,
+        peak_equity=peak_equity,
+    ))
     print(f"[{datetime.now(tz=timezone.utc).isoformat()}] cycle complete; equity ${equity_after:.4f}")
     return 0
 
