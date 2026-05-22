@@ -99,6 +99,31 @@ def test_post_halt_uses_red_color_and_urgent_marker(monkeypatch):
     assert "drawdown" in json.dumps(embed).lower()
 
 
+def test_post_halt_truncates_long_reason(monkeypatch):
+    monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/x/y")
+    captured = {}
+
+    def fake_urlopen(req, timeout):
+        captured["body"] = json.loads(req.data.decode())
+        ctx = MagicMock()
+        ctx.__enter__ = lambda self: MagicMock(status=204)
+        ctx.__exit__ = lambda self, *a: False
+        return ctx
+
+    long_reason = "X" * 5000
+    with patch("btc_portfolio_mgr.live.notifications.urlopen", side_effect=fake_urlopen):
+        post_halt(HaltContext(
+            network="testnet",
+            reason=long_reason,
+            equity=1000.0,
+            position_btc=0.0,
+            mark_price=70000.0,
+        ))
+    desc = captured["body"]["embeds"][0]["description"]
+    assert len(desc) <= 1100  # bounded
+    assert "XXX" in desc  # but content preserved
+
+
 def test_post_summary_swallows_network_errors(monkeypatch):
     monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/x/y")
     from urllib.error import URLError

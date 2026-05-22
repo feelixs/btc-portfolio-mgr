@@ -253,6 +253,13 @@ def run(dry_run: bool = False) -> int:
             client_order_id=client_order_id,
         )
     except Exception as exc:
+        post_halt(HaltContext(
+            network=client.network,
+            reason=f"order_error ({client_order_id}): {exc}",
+            equity=equity_before,
+            position_btc=current_btc,
+            mark_price=mark_price,
+        ))
         append_log_row(
             LOG_PATH,
             _log_row(

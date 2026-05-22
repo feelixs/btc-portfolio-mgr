@@ -121,7 +121,7 @@ def _summary_fields(ctx: SummaryContext) -> list[dict[str, Any]]:
     elif ctx.action == "halt":
         fields.append({
             "name": "Action",
-            "value": f"halted: {ctx.halt_reason}",
+            "value": f"halted: {(ctx.halt_reason or '')[:1000]}",
             "inline": False,
         })
     else:
@@ -145,7 +145,7 @@ def post_halt(ctx: HaltContext) -> None:
     notional_held = abs(ctx.position_btc) * ctx.mark_price
     embed = {
         "title": f"🚨 BTC Portfolio — RISK HALT ({ctx.network})",
-        "description": f"**Reason:** {ctx.reason}",
+        "description": f"**Reason:** {ctx.reason[:1000]}",
         "color": COLOR_RED,
         "timestamp": datetime.now(tz=timezone.utc).isoformat(),
         "fields": [
