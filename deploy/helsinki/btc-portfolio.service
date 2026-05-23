@@ -6,6 +6,11 @@ After=network.target
 Type=oneshot
 WorkingDirectory=/opt/btc-portfolio-mgr
 EnvironmentFile=/opt/btc-portfolio-mgr/.env
+# Refresh hourly bars + features before inference. `-` prefix makes failures
+# non-blocking so the staleness gate in run_live.py remains the safety net
+# (better to halt loudly than trade on stale data).
+ExecStartPre=-/opt/btc-portfolio-mgr/.venv/bin/python scripts/backfill_historical.py
+ExecStartPre=-/opt/btc-portfolio-mgr/.venv/bin/python scripts/build_features.py
 ExecStart=/opt/btc-portfolio-mgr/.venv/bin/python scripts/run_live.py
 StandardOutput=append:/var/log/btc-portfolio.log
 StandardError=append:/var/log/btc-portfolio.log
