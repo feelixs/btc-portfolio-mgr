@@ -1,9 +1,9 @@
 """target weight + current position + price → market order (or skip)."""
 from __future__ import annotations
 
-import math
 import uuid
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 from btc_portfolio_mgr.live.account import SymbolInfo
@@ -22,12 +22,19 @@ class OrderDecision:
 
 
 def round_to_lot(qty: float, lot_step: float) -> float:
-    """Floor |qty| to the nearest multiple of lot_step, preserving sign."""
+    """Floor |qty| to the nearest multiple of lot_step, preserving sign.
+
+    Uses Decimal to avoid float artifacts: `132 * 0.0001` in float is
+    `0.013200000000000002` (18 decimals), which Binance rejects with -1111
+    "Precision is over the maximum defined for this asset."
+    """
     if lot_step <= 0:
         return qty
-    sign = 1.0 if qty >= 0 else -1.0
-    floored = math.floor(abs(qty) / lot_step) * lot_step
-    return sign * floored
+    abs_q = Decimal(str(abs(qty)))
+    step = Decimal(str(lot_step))
+    floored = (abs_q // step) * step
+    result = -floored if qty < 0 else floored
+    return float(result)
 
 
 def compute_required_delta(

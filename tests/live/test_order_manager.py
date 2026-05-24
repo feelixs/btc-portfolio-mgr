@@ -16,6 +16,21 @@ def test_round_to_lot_floors_toward_zero():
     assert round_to_lot(0.0, 0.001) == 0.0
 
 
+def test_round_to_lot_no_float_precision_artifacts():
+    """Regression: 132 * 0.0001 in float is 0.013200000000000002 (18 decimals),
+    which Binance rejects with -1111 'Precision is over the maximum'.
+    The function must produce a value with exactly the lot's decimal precision.
+    """
+    result = round_to_lot(0.013211, 0.0001)
+    # repr should show no float artifact beyond the lot precision
+    assert repr(result) == "0.0132", f"got {result!r}"
+    # Same for negative
+    result_neg = round_to_lot(-0.013211, 0.0001)
+    assert repr(result_neg) == "-0.0132", f"got {result_neg!r}"
+    # And for the case observed live (-0.006700 → +0.013211 buy)
+    assert repr(round_to_lot(0.006711, 0.0001)) == "0.0067"
+
+
 def test_compute_required_delta_long_position():
     # equity=$10, weight=1.0, price=$50_000 -> target_btc = 10/50_000 = 0.0002
     delta = compute_required_delta(
